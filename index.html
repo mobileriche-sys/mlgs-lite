@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MLGS Lite — 5‑Level Earnings & Leads</title>
+<style>
+  :root{--bg:#0e0116;--panel:#141922;--ink:#e8edf2;--muted:#9aa6b2;--accent:#1fb6ff}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+  .wrap{max-width:720px;margin:20px auto;padding:14px}
+  .card{background:var(--panel);border:1px solid #1f2633;border-radius:14px;padding:14px}
+  h1{font-size:18px;margin:0 0 8px;text-align:center}
+  .note{color:var(--muted);font-size:12px;margin:0 auto 10px;max-width:640px;text-align:center}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:680px){.grid{grid-template-columns:1fr}}
+  label{display:block;font-weight:600;font-size:13px;margin:0 0 6px}
+  input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid #2a3445;background:#0f1420;color:var(--ink)}
+  button{width:100%;padding:12px;border:0;border-radius:10px;background:var(--accent);color:#001018;font-weight:700;cursor:pointer}
+  .out{margin-top:12px;border-top:1px solid #222c3e;padding-top:12px}
+  .row{display:flex;justify-content:space-between;margin:6px 0}
+  .row strong{font-weight:700}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+  .muted{color:var(--muted);font-size:12px;margin-top:8px}
+  .lvl{display:grid;grid-template-columns:64px 1fr 1fr;gap:8px;margin-top:6px}
+  .lvl div{padding:8px;border:1px solid #293244;border-radius:8px;background:#101722}
+  /* compact for iframe */
+  .tight h1{display:none}.tight .note{display:none}.tight .wrap{margin:0}.tight body{background:transparent}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>MLGS Lite — 5‑Level Earnings & Leads</h1>
+      <div class="note">Payouts assumed: <span class="mono">$5 / $4 / $3 / $2 / $1</span> on levels 1–5. Bonus: <span class="mono">$100</span> per <span class="mono">5</span> new direct sales. Cost: <span class="mono">$30</span>/account/month. Leads: <span class="mono">100</span>/account/day.</div>
+
+      <div class="grid">
+        <div>
+          <label>Number of Accounts</label>
+          <input type="number" id="accounts" value="1" min="1" max="20">
+        </div>
+        <div>
+          <label>Direct Active Sales (Level 1 count)</label>
+          <input type="number" id="l1" value="0" min="0">
+        </div>
+        <div>
+          <label>Duplication: sales each person makes (X)</label>
+          <input type="number" id="dup" value="0" min="0" max="20">
+        </div>
+        <div>
+          <label>Depth (levels to pay, 1–5)</label>
+          <input type="number" id="depth" value="5" min="1" max="5">
+        </div>
+        <div>
+          <label>New Direct Sales this month (for $100 bonus)</label>
+          <input type="number" id="newDirect" value="0" min="0">
+        </div>
+        <div style="align-self:end">
+          <button id="go">Calculate</button>
+        </div>
+      </div>
+
+      <div class="out" id="out">
+        <div class="row"><div>Daily Leads</div><strong class="mono" id="leads">0</strong></div>
+        <div class="row"><div>Monthly Cost</div><strong class="mono" id="cost">$0</strong></div>
+
+        <div class="muted">Network size by level (from your L1 and duplication X):</div>
+        <div class="lvl">
+          <div class="mono">L1</div><div id="lvl1c" class="mono">0</div><div id="lvl1p" class="mono">$0</div>
+          <div class="mono">L2</div><div id="lvl2c" class="mono">0</div><div id="lvl2p" class="mono">$0</div>
+          <div class="mono">L3</div><div id="lvl3c" class="mono">0</div><div id="lvl3p" class="mono">$0</div>
+          <div class="mono">L4</div><div id="lvl4c" class="mono">0</div><div id="lvl4p" class="mono">$0</div>
+          <div class="mono">L5</div><div id="lvl5c" class="mono">0</div><div id="lvl5p" class="mono">$0</div>
+        </div>
+
+        <div class="row" style="margin-top:8px"><div>Recurring Commissions (L1–L5)</div><strong class="mono" id="rec">$0</strong></div>
+        <div class="row"><div>Fast‑Start Bonuses ($100 / 5 new directs)</div><strong class="mono" id="bonus">$0</strong></div>
+        <div class="row"><div>Total Earnings</div><strong class="mono" id="earn">$0</strong></div>
+        <div class="row"><div>Net Profit / Loss</div><strong class="mono" id="net">$0</strong></div>
+
+        <div class="muted">Formulae: Level earnings = count × rate; rates = $5,$4,$3,$2,$1 for L1–L5. Bonus = ⌊NewDirect/5⌋×100. Levels: L1 = directs; L(n) = L(n−1)×X.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // Auto-compact if embedded: add ?embed=1 to iframe src
+  if (location.search.includes("embed=1")) document.body.classList.add("tight");
+
+  const rates = [5,4,3,2,1]; // L1..L5
+  const $ = id => document.getElementById(id);
+  const fmt = n => n.toLocaleString();
+  const money = n => "$"+n.toLocaleString();
+
+  function calc(){
+    const accounts  = Math.max(1, parseInt($("accounts").value)||0);
+    const l1        = Math.max(0, parseInt($("l1").value)||0);
+    const dup       = Math.max(0, parseInt($("dup").value)||0);
+    const depth     = Math.min(5, Math.max(1, parseInt($("depth").value)||1));
+    const newDirect = Math.max(0, parseInt($("newDirect").value)||0);
+
+    // Leads & cost
+    const dailyLeads  = accounts * 100;
+    const monthlyCost = accounts * 30;
+
+    // Build level counts
+    const levels = [0,0,0,0,0];
+    levels[0] = l1; // L1
+    for(let i=1;i<5;i++){
+      levels[i] = Math.round(levels[i-1] * dup);
+    }
+    // Zero out beyond chosen depth
+    for(let i=depth;i<5;i++) levels[i] = 0;
+
+    // Payouts per level
+    const pays = levels.map((cnt, i)=> cnt * rates[i]);
+    const recurring = pays.reduce((a,b)=>a+b,0);
+
+    // Bonus on new directs
+    const bonus = Math.floor(newDirect/5)*100;
+
+    const earnings = recurring + bonus;
+    const net = earnings - monthlyCost;
+
+    // UI
+    $("leads").textContent = fmt(dailyLeads);
+    $("cost").textContent  = money(monthlyCost);
+
+    ["lvl1c","lvl2c","lvl3c","lvl4c","lvl5c"].forEach((id, i)=> $(id).textContent = fmt(levels[i]));
+    ["lvl1p","lvl2p","lvl3p","lvl4p","lvl5p"].forEach((id, i)=> $(id).textContent = money(pays[i]));
+
+    $("rec").textContent   = money(recurring);
+    $("bonus").textContent = money(bonus);
+    $("earn").textContent  = money(earnings);
+    $("net").textContent   = money(net);
+  }
+
+  document.getElementById("go").addEventListener("click", calc);
+  calc();
+})();
+</script>
+</body>
+</html>
